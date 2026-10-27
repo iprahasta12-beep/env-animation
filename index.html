@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stake Review</title>
+<style>
+  :root {
+    --bg: #0d0a08;
+    --panel: rgba(24, 18, 14, 0.94);
+    --line: #3a2a1f;
+    --line-2: #4d3727;
+    --text: #f1e7dc;
+    --muted: #a08d7c;
+    --accent: #e8742c;
+    --accent-2: #ffb15c;
+    --spine: #4fb3c8;
+    --danger: #d9534a;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.35 var(--sans); overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  #stage { position: fixed; inset: 0 320px 0 0; display: grid; place-items: center; transition: right .2s; }
+  body.panel-hidden #stage { right: 0; }
+  #stage canvas { display: block; box-shadow: 0 0 0 1px #2a1f17, 0 20px 60px rgba(0,0,0,.6); }
+
+  /* ---------- panel ---------- */
+  #panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 320px;
+    background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; transition: transform .2s;
+  }
+  body.panel-hidden #panel { transform: translateX(100%); }
+  #btn-panel {
+    position: fixed; top: 12px; right: 332px; z-index: 5; width: 32px; height: 32px;
+    border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel); color: var(--muted);
+    display: grid; place-items: center; transition: right .2s;
+  }
+  body.panel-hidden #btn-panel { right: 12px; }
+  #btn-panel svg { width: 16px; height: 16px; fill: currentColor; }
+
+  header.top { padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .brand h1 { margin: 0; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+  .brand h1 span { color: var(--accent); }
+  #clock { font: 11px var(--mono); color: var(--muted); }
+
+  .transport { display: grid; grid-template-columns: 52px 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .tbtn {
+    height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: #21180f;
+    display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;
+  }
+  .tbtn:hover { border-color: #6b4a33; }
+  .tbtn svg { width: 16px; height: 16px; fill: currentColor; }
+  #btn-play.on { background: var(--accent); border-color: var(--accent); color: #1a0f07; }
+  #btn-loop.on { color: var(--accent-2); border-color: #7a4a26; background: #2a1a0e; }
+  .keys { margin-top: 8px; font: 10.5px var(--mono); color: #7a6858; }
+  .keys kbd { font: inherit; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 3px; color: var(--muted); }
+
+  .scroll { flex: 1; overflow-y: auto; padding: 4px 0 12px; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: #3a2a1f; border-radius: 4px; }
+
+  .bar { display: flex; align-items: center; gap: 6px; padding: 10px 16px 4px; }
+  .bar h2 { margin: 0; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex: 1; }
+  #count { font: 11px var(--mono); color: var(--muted); margin-right: 4px; }
+  .mini {
+    border: 1px solid var(--line-2); background: transparent; border-radius: 6px;
+    padding: 2px 7px; font-size: 11px; color: var(--muted);
+  }
+  .mini:hover { color: var(--text); border-color: #6b4a33; }
+  .mini.danger:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+
+  .grp { margin: 6px 10px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .grp-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 10px; background: #1d1510; border-bottom: 1px solid var(--line); }
+  .grp-name { flex: 1; font-weight: 600; font-size: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; cursor: pointer; user-select: none; }
+  .row + .row { border-top: 1px solid #241a13; }
+  .row:hover { background: #20170f; }
+  .row input { position: absolute; opacity: 0; pointer-events: none; }
+  .sw { width: 30px; height: 17px; border-radius: 9px; background: #3b2c21; position: relative; flex: none; transition: background .15s; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #8c7766; transition: transform .15s, background .15s; }
+  .row input:checked + .sw { background: var(--accent); }
+  .row input:checked + .sw::after { transform: translateX(13px); background: #fff4e8; }
+  .row input:focus-visible + .sw { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+  .nm { flex: 1; font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.off .nm { color: #7d6b5c; }
+  .tag { font: 9.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: #7d6b5c; border: 1px solid #3a2a1f; border-radius: 4px; padding: 0 4px; }
+  .tag.sp { color: var(--spine); border-color: #24505a; }
+
+  /* ---------- spine ---------- */
+  .drop {
+    margin: 6px 10px 0; border: 1.5px dashed #5a412e; border-radius: 10px; padding: 14px 12px;
+    text-align: center; color: var(--muted); cursor: pointer; display: block;
+  }
+  .drop:hover { border-color: var(--accent); color: var(--text); }
+  .drop b { color: var(--text); display: block; margin-bottom: 2px; }
+  .drop small { font: 10.5px var(--mono); }
+  .chk { display: flex; align-items: center; gap: 8px; margin: 8px 16px 0; color: var(--muted); font-size: 12px; }
+  .chk input { accent-color: var(--accent); }
+  #sk-hint { margin: 8px 16px 0; font-size: 11px; color: #7d6b5c; }
+  .sk { margin: 8px 10px 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+  .sk.sel { border-color: var(--spine); box-shadow: inset 0 0 0 1px #24505a; }
+  .sk-title { display: flex; align-items: center; gap: 8px; }
+  .sk-title b { flex: 1; font: 600 12px var(--mono); }
+  .ver { font: 10px var(--mono); color: var(--spine); }
+  .sk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .num { display: flex; flex-direction: column; gap: 2px; font: 10px var(--mono); color: var(--muted); }
+  .num.wide { grid-column: 1 / -1; }
+  .num input, .num select {
+    width: 100%; background: #140f0b; color: var(--text); border: 1px solid var(--line-2);
+    border-radius: 6px; padding: 4px 6px; font: 12px var(--mono);
+  }
+
+  footer.bot { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  footer.bot button { height: 34px; border-radius: 8px; border: 1px solid var(--line-2); background: #21180f; font-weight: 600; font-size: 12px; }
+  footer.bot button:hover { border-color: var(--accent); }
+  footer.bot button.pri { background: var(--accent); border-color: var(--accent); color: #1a0f07; }
+
+  /* ---------- drop overlay + toasts ---------- */
+  #overlay {
+    position: fixed; inset: 0; z-index: 10; display: none; place-items: center;
+    background: rgba(13, 10, 8, .8); border: 3px dashed var(--accent); pointer-events: none;
+  }
+  #overlay div { text-align: center; font-size: 18px; font-weight: 700; }
+  #overlay small { display: block; margin-top: 6px; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
+  body.dragging #overlay { display: grid; }
+  #toasts { position: fixed; left: 16px; bottom: 16px; z-index: 11; display: flex; flex-direction: column; gap: 6px; max-width: 460px; }
+  .toast { background: #22180f; border: 1px solid var(--line-2); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 8px; font-size: 12px; transition: opacity .5s, transform .5s; }
+  .toast.err { border-left-color: var(--danger); }
+  .toast.out { opacity: 0; transform: translateY(6px); }
+
+  @media (max-width: 760px) {
+    #stage { inset: 0 0 45vh 0; }
+    #panel { top: 55vh; width: 100%; border-left: 0; border-top: 1px solid var(--line); }
+    #btn-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <button id="btn-panel" title="Toggle panel (H)" aria-label="Toggle panel">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z"/></svg>
+  </button>
+
+  <aside id="panel">
+    <header class="top">
+      <div class="brand"><h1>Stake <span>Review</span></h1><span id="clock">0.0s</span></div>
+      <div class="transport">
+        <button class="tbtn" id="btn-play" aria-label="Play / pause"></button>
+        <button class="tbtn" id="btn-restart" title="Restart (R)">
+          <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>Restart
+        </button>
+        <button class="tbtn" id="btn-loop" title="Loop on/off (L)">
+          <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zM17 17H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg><span id="loop-state">Loop</span>
+        </button>
+      </div>
+      <div class="keys"><kbd>Space</kbd> play <kbd>R</kbd> restart <kbd>L</kbd> loop <kbd>H</kbd> panel</div>
+    </header>
+
+    <div class="scroll">
+      <div class="bar">
+        <h2>Animations</h2><span id="count"></span>
+        <button class="mini" id="btn-all">all on</button><button class="mini" id="btn-none">all off</button>
+      </div>
+      <div id="anim-list"></div>
+
+      <div class="bar"><h2>Spine 3.8 · Bone Studio export</h2></div>
+      <label class="drop" for="file-input">
+        <b>Drop or click to load</b>
+        <small>.json / .skel + .atlas + .png</small>
+      </label>
+      <input type="file" id="file-input" multiple hidden accept=".json,.skel,.atlas,.txt,.png,.jpg,.jpeg,.webp">
+      <label class="chk"><input type="checkbox" id="pma"> Atlas uses premultiplied alpha (set before loading)</label>
+      <div id="sk-list"></div>
+      <div id="sk-hint">Shift + drag on canvas moves the selected skeleton.</div>
+    </div>
+
+    <footer class="bot">
+      <button id="btn-json">Export config.json</button>
+      <button id="btn-js" class="pri">Export config.js</button>
+    </footer>
+  </aside>
+
+  <div id="overlay"><div>Drop files to load<small>Spine skeleton + atlas + images · config.json · or a PNG to swap background</small></div></div>
+  <div id="toasts"></div>
+
+  <script src="lib/pixi.min.js"></script>
+  <script src="lib/pixi-spine.umd.js"></script>
+  <script src="config.js"></script>
+  <script src="assets/background.js"></script>
+  <script src="js/placeholders.js"></script>
+  <script src="js/spine-loader.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
